@@ -1,0 +1,60 @@
+	addi $a2, $0, 0x3000  # IO
+	addi $t8, $t8, 256
+	
+	sw $t8, 12($a2)	# avisa al productor de que está listo
+
+	addi $a0, $0, 0x1000 # datos de entrada
+	addi $a1, $0, 0x2000 # resultados
+
+inicioEspera:
+	lw $t0, 0($a2)
+	beq $t0, $0, inicioEspera
+
+	add $t0, $0, $0	# i
+	add $t1, $0, $0	# j
+
+bucleFor:
+	addi $t2, $t0, 0	# copia
+	add $t3, $0, $0	# resultado
+	addi $t4, $0, 8
+bucleRev:
+	andi $t5, $t2, 1
+	sll $t3, $t3, 1
+	or $t3, $t3, $t5
+	srl $t2, $t2, 1
+	addi $t4, $t4, -1
+	bne $t4, $0, bucleRev	# i = 0, 1, 2, 3, 4 está invertido en $t4
+
+	sll $t3, $t3, 3		# multiplico por 2 y por 4
+	add $s0, $a0, $t3	# dirección del primer dato
+	lw $t5, 0($s0)		# lee el primer dato
+	lw $s5, 4($s0)		# parte imaginaria
+	lw $t6, 1024($s0)	# lee el segundo, con una dirección que tiene un 1 en la posición más significativa 
+	lw $s6, 1028($s0)	# parte imaginaria 
+	sll $t3, $t0, 3		# multiplico por 2 y por 4
+
+	add $s0, $a1, $t3	# dirección del primer resultado
+	add $t7, $t5, $t6
+	sw $t7, 0($s0)		# primer resultado guardado
+	sub $t7, $t5, $t6
+	sw $t7, 8($s0)		# segundo resultado guardado
+
+	add $t7, $s5, $s6
+	sw $t7,4($s0)		# imaginaria del primer resultado
+	sub $t7, $s5, $s6
+	sw $t7,12($s0)		# imaginaria del segundo resultado
+
+	addi $t0, $t0, 2
+	bne $t0, $t8, bucleFor	# compara con 256
+
+	sw $t8, 4($a2)	# avisa al consumidor de que terminó
+	sw $t8, 12($a2)	# avisa al productor de que está listo
+consumidor:
+	lw $t0, 8($a2)
+	beq $t0, $0, consumidor	# espera a que el consumidor esté listo
+
+	addi $t0, $0, 0x800	# distancia entre juegos de datos/resultados
+	xor $a0, $a0, $t0	# conmutamos entre juegos
+	xor $a1, $a1, $t0
+
+	j inicioEspera

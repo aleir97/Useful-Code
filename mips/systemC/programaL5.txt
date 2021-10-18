@@ -1,0 +1,90 @@
+	addi $a2, $0, 0x3000  # IO
+	addi $a3, $0, 0x800  # datos internos no compartidos
+	addi $t8, $0, 128
+
+	addi $v0, $0, 0x0005	# nivel
+	addi $v1, $0, 8
+	sllv $v0, $v1, $v0	# NB2
+	srl $v1, $v0, 1		#NB
+	addi $a0, $0, 0x1000 # datos de entrada
+	addi $a1, $0, 0x2000 # resultados
+
+inicioEspera:
+	lw $t0, 0($a2)
+	beq $t0, $0, inicioEspera
+
+
+	add $s0, $a0, $0
+	add $s1, $a0, $v0
+	add $s2, $a1, $0
+	add $s3, $a1, $v0
+
+	add $t0, $0, $0
+
+loop_i:
+
+	add $s4, $a3, $0	# puntero ur[j]
+	add $s5, $a3, $v1	# puntero ui[j]
+
+	add $t1, $0, $0		# j
+
+
+loop_j: 
+
+	lw $t2, 0($s4)		# carga ur[j]
+	lw $t3, 0($s5)		# carga ui[j]
+
+	lw $t4, 0($s0)	# lee fftBuffer[i]
+	lw $t5, 4($s0)	# lee fftBuffer[i+1]
+	lw $t6, 0($s1)	# lee fftBuffer[i+B]
+	lw $t7, 4($s1)	# lee fftBuffer[i+B+1]
+
+	mult $t6, $t2
+	mflo $s6
+	mult $t7, $t3
+	mflo $s7
+
+	sub $s6, $s6, $s7	# resta
+	sra $s6, $s6, 8		# tr				tmp = (fftBuffer[i+B] * ur[j] - fftBuffer[i+B+1] * ui[j]);	tr = tmp >> 12;	
+
+	mult $t6, $t3
+	mflo $t6	# se puede reutilizar
+	mult $t7, $t2
+	mflo $t7	# se puede reutilizar
+
+	add $t6, $t6, $t7	# suma
+	sra $t6, $t6, 8		# ti				tmp = (fftBuffer[i+B] * ui[j] + fftBuffer[i+B+1] * ur[j]);	ti = tmp >> 12;
+	
+	sub $t2, $t4, $s6	# fftBuffer[i] - tr;
+	sub $t3, $t5, $t6	# fftBuffer[i+1] - ti;
+	sw $t2, 0($s3)		# fftBuffer[i+B] <-
+	sw $t3, 4($s3)		# fftBuffer[i+B+1] <-
+
+	add $t2, $t4, $s6	# fftBuffer[i] + tr;
+	add $t3, $t5, $t6	# fftBuffer[i+1] + ti;
+	sw $t2, 0($s2)		# fftBuffer[i] <-
+	sw $t3, 4($s2)		# fftBuffer[i+1] <-
+		
+	addi $s0, $s0, 8
+	addi $s1, $s1, 8	
+	addi $s2, $s2, 8	
+	addi $s3, $s3, 8	
+	addi $s4, $s4, 4	
+	addi $s5, $s5, 4	
+
+	addi $t0, $t0, 1
+	addi $t1, $t1, 8
+	bne $t1, $v0, loop_j
+	
+	add $s0, $s0, $v0
+	add $s1, $s1, $v0
+	add $s2, $s2, $v0
+	add $s3, $s3, $v0
+	
+	bne $t0, $t8, loop_i
+	
+	sw $t8, 4($a2)		# aviso de que terminé
+	addi $t0, $0, 0x800	# distancia entre juegos de datos/resultados
+	xor $a0, $a0, $t0	# conmutamos entre juegos
+	xor $a1, $a1, $t0
+	j inicioEspera	

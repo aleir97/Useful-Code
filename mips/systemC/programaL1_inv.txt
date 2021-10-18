@@ -1,0 +1,64 @@
+	addi $a2, $0, 0x3000  # IO
+	addi $t8, $t8, 512
+
+	sw $t8, 12($a2)	# avisa al productor de que está listo
+
+	add $s2, $0, $0	# chapucilla para hacer el exor
+
+inicioEspera:
+
+	lw $t0, 0($a2)
+	beq $t0, $0, inicioEspera
+
+	addi $a0, $0, 0x1000 # datos de entrada
+	addi $a1, $0, 0x2000 # resultados
+
+	xor $a0, $a0, $s2
+	xor $a1, $a1, $s2
+
+	add $t0, $0, $0	# i
+	add $t1, $0, $0	# j
+
+bucleFor:
+	lw $t4, 0($a0)	# lee fftBuffer[i]
+	lw $t5, 4($a0)	# lee fftBuffer[i+1]
+	lw $t6, 16($a0)	# lee fftBuffer[i+4]
+	lw $t7, 20($a0)	# lee fftBuffer[i+5]
+	beq $t1, $0, jZero
+	sub $t2, $0, $t7	# tr = -fftBuffer[i+5]
+	add $t3, $0, $t6	# ti = fftBuffer[i+4]
+	j sigue
+jZero:
+	add $t2, $0, $t6	# tr = fftBuffer[i+4]
+	add $t3, $0, $t7	# ti = fftBuffer[i+5]
+sigue:
+	sub $s0, $t4, $t2
+	sw $s0, 16($a1)	# almacena fftBuffer[i+4]
+	sub $s1, $t5, $t3
+	sw $s1, 20($a1)	# almacena fftBuffer[i+5]
+	
+	add $s0, $t4, $t2
+	sw $s0, 0($a1)	# almacena fftBuffer[i]
+	add $s1, $t5, $t3
+	sw $s1, 4($a1)	# almacena fftBuffer[i+1]
+
+	addi $t0, $t0, 2	# i += 2
+	addi $a0, $a0, 8	# avanza 2 palabras
+	addi $a1, $a1, 8	# avanza 2 palabras
+	
+	beq $t1, $0, jZero2	# compara j con cero
+	addi $t0, $t0, 4	# i += 4 a mayores
+	addi $a0, $a0, 16	# avanza 4 palabras
+	addi $a1, $a1, 16	# avanza 4 palabras
+	addi $t1, $0, -1	# truqillo
+jZero2:
+	addi $t1, $t1, 1
+	bne $t0, $t8, bucleFor	# compara con 512
+
+	sw $t8, 4($a2)	# avisa al consumidor de que terminó
+	sw $t8, 12($a2)	# avisa al productor de que está listo
+
+	addi $t0, $0, 0x800	# chapucilla para hacer el exor
+	xor $s2, $s2, $t0
+
+	j inicioEspera
