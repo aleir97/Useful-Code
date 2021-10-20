@@ -1,0 +1,3 @@
+Instrucciones de compilacion:
+gcc -Wall -pthread -c queue.c 
+gcc -Wall -pthread multi_Ttest.c queue.o
